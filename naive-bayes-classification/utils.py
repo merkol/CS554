@@ -11,12 +11,14 @@ def gaussian_dist(x, mu, var):
 # Generate data
 def generate_data(mu, sigma, n, label):
     # Generate n integer data points with label
-    return np.sort(np.append(np.random.normal(mu, sigma, (n, 1)), label * np.ones((n, 1), dtype=int), axis=1), axis = 0)
+    return np.append(np.random.normal(mu, sigma, (n, 1)), label * np.ones((n, 1), dtype=int), axis=1)
 
 # Merge data
 def merge_data(data1, data2):
     merged = np.concatenate((data1, data2), axis=0)
-    return merged
+    # Sort data by age for better visualization
+    return merged[merged[: , 0].argsort()]
+
 
 def calcualate_prior(data):
     # Calculate P(Golf) and P(Polo)
@@ -46,15 +48,11 @@ def accuracy(true, pred):
 
 
 # Classify and visualize 
-def classify_and_visualize(data, results, plt):
-    plot_scatter([data[i, 0] for i in range(len(data))], [proba[0] for proba in results],"","Age","probabilities","P(Polo | Age)","orange", plt)
-    plot_scatter([data[i, 0] for i in range(len(data))], [proba[1] for proba in results],"","Age","probabilities","P(Golf | Age)","red", plt)
-    
-    cm = confusion_matrix(data[:, 1], [1 if i[1] > i[0] else 0 for i in results])
+def classify_and_visualize(data, results):
+    cm = confusion_matrix(data[:, 1], results)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Polo", "Golf"])
     disp.plot()
 
-    return results
 
 def create_fig():
     fig = plt.figure()

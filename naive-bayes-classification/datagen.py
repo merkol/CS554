@@ -4,8 +4,8 @@ from utils import generate_data, merge_data
 
 if __name__ == "__main__":
     # Generating data for training
-    polo_train = generate_data(mu=29, sigma=5, n = 100, label=0)
-    golf_train = generate_data(mu=44, sigma=5,n = 100, label=1)
+    polo_train = generate_data(mu=29, sigma=6, n = 100, label=0)
+    golf_train = generate_data(mu=44, sigma=4,n = 100, label=1)
 
     # Generating data for testing
     polo_test = generate_data(mu=32, sigma=4.2, n=30, label=0)
