@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from utils import gaussian_dist, plot_line, plot_scatter, calcualate_prior, create_fig, classify_and_visualize, accuracy, predict
+from utils import *
 
 def run():
     # Setting parameters
-    equal_loss = False
+    equal_loss = True
     
     # Creating figures
     likelihoods = create_fig()
@@ -61,61 +61,48 @@ def run():
         plot_line(data[:, 0], [proba[0] for proba in results],title,"Age","probabilities","P(Polo | Age)","orange", axes)
         plot_line(data[:, 0], [proba[1] for proba in results],title,"Age","probabilities","P(Golf | Age)","red", axes)
     
-    # TODO : Calculate the threshold for reject option
+    # Calculating the results and define reject threshold
     if equal_loss:
         train_results = [1 if proba[1] > proba[0] else 0 for proba in train_probas]
         test_results = [1 if proba[1] > proba[0] else 0 for proba in test_probas]
     else:
-        polo_cost, golf_cost = 10, 5    
-        
-        # Risks
-        train_risks = [[proba[1] * golf_cost, proba[0] * polo_cost] for proba in train_probas]
-        test_risks = [[proba[1] * golf_cost, proba[0] * polo_cost] for proba in test_probas]
+        polo_cost, golf_cost = 10, 5
         
         if polo_cost > golf_cost:
-            threshold_p_polo_select = (polo_cost - 1) / polo_cost
-            threshold_p_polo_not_select = 1 / golf_cost
+            thresholds_and_results = calculate_thresholds(polo_cost, golf_cost, train_probas, test_probas,0)
             
-            train_results = [0 if proba[0] > threshold_p_polo_select else 1 for proba in train_probas]
-            test_results = [0 if proba[0] > threshold_p_polo_select else 1 for proba in test_probas]
-        
-            train_results = []
-            for proba in train_probas:
-                if proba[0] > threshold_p_polo_select:
-                    train_results.append(0)
-                elif proba[0] < threshold_p_polo_not_select:
-                    train_results.append(1)
-                else:
-                    train_results.append(-1)
+            train_results = thresholds_and_results[0]
+            test_results = thresholds_and_results[1]
             
-            test_results = []
-            for proba in test_probas:
-                if proba[0] > threshold_p_polo_select:
-                    test_results.append(0)
-                elif proba[0] < threshold_p_polo_not_select:
-                    test_results.append(1)
-                else:
-                    test_results.append(-1)
-            
-            train_post.axhline(y=threshold_p_polo_select, color='blue', label="Reject Threshold")
-            train_post.axhline(y=threshold_p_polo_not_select, color='blue')
+            train_post.axhline(y=thresholds_and_results[2], color='blue', label="Reject Threshold Polo")
+            train_post.axhline(y=thresholds_and_results[3], color='blue')
             train_post.legend()
             
         elif polo_cost < golf_cost:
-            threshold_p_golf_select = (golf_cost - 1) / golf_cost
-            threshold_p_golf_not_select = 1 / polo_cost
+            
+            thresholds_and_results = calculate_thresholds(golf_cost, polo_cost, train_probas, test_probas,1)
+            
+            train_results = thresholds_and_results[0]
+            test_results = thresholds_and_results[1]
+            
+            train_post.axhline(y=thresholds_and_results[2], color='blue', label="Reject Threshold Golf")
+            train_post.axhline(y=thresholds_and_results[3], color='blue')
+            train_post.legend()
+            
         
-            train_results = [1 if risk[1] < risk[0] else 0 for risk in train_risks]
-            test_results = [1 if risk[1] < risk[0] else 0 for risk in test_risks]
-        
-
     # Visualize the results
-    # classify_and_visualize(train_data, train_results)
-    # classify_and_visualize(test_data, test_results)
+    classify_and_visualize(train_data, train_results, not equal_loss)
+    classify_and_visualize(test_data, test_results, not equal_loss)
     
     # Calculate accuracy
-    print(f"Accuracy of Train : {accuracy(train_data[:, 1], train_results)}")
-    print(f"Accuracy of Test : {accuracy(test_data[:, 1], test_results)}")
+    print(f"Accuracy of Train : {accuracy(train_data[:, 1], train_results).round(2)}")
+    print(f"Accuracy of Test : {accuracy(test_data[:, 1], test_results).round(2)}")
+    print()
+    print(f"Precision of Train : {precision(train_data[:, 1], train_results, labels = [0,1] if equal_loss else [0,1,-1]).round(2)}")
+    print(f"Recall of Train : {recall(train_data[:, 1], train_results, labels = [0, 1] if equal_loss else [0,1,-1]).round(2)}")
+    print()
+    print(f"Precision of Test : {precision(test_data[:, 1], test_results, labels = [0, 1] if equal_loss else [0,1,-1]).round(2)}")
+    print(f"Recall of Test : {recall(test_data[:, 1], test_results, labels = [0, 1] if equal_loss else [0,1,-1]).round(2)}")
     
     # Comparing with sklearn
     # print(predict(35, p_golf, p_polo, golf_mean, golf_var, polo_mean, polo_var))
