@@ -75,20 +75,43 @@ def run():
         if polo_cost > golf_cost:
             threshold_p_polo_select = (polo_cost - 1) / polo_cost
             threshold_p_polo_not_select = 1 / golf_cost
-            train_post.axhline(y=threshold_p_polo_select, color='blue')
+            
+            train_results = [0 if proba[0] > threshold_p_polo_select else 1 for proba in train_probas]
+            test_results = [0 if proba[0] > threshold_p_polo_select else 1 for proba in test_probas]
+        
+            train_results = []
+            for proba in train_probas:
+                if proba[0] > threshold_p_polo_select:
+                    train_results.append(0)
+                elif proba[0] < threshold_p_polo_not_select:
+                    train_results.append(1)
+                else:
+                    train_results.append(-1)
+            
+            test_results = []
+            for proba in test_probas:
+                if proba[0] > threshold_p_polo_select:
+                    test_results.append(0)
+                elif proba[0] < threshold_p_polo_not_select:
+                    test_results.append(1)
+                else:
+                    test_results.append(-1)
+            
+            train_post.axhline(y=threshold_p_polo_select, color='blue', label="Reject Threshold")
             train_post.axhline(y=threshold_p_polo_not_select, color='blue')
+            train_post.legend()
             
         elif polo_cost < golf_cost:
             threshold_p_golf_select = (golf_cost - 1) / golf_cost
             threshold_p_golf_not_select = 1 / polo_cost
         
-        train_results = [1 if risk[1] < risk[0] else 0 for risk in train_risks]
-        test_results = [1 if risk[1] < risk[0] else 0 for risk in test_risks]
+            train_results = [1 if risk[1] < risk[0] else 0 for risk in train_risks]
+            test_results = [1 if risk[1] < risk[0] else 0 for risk in test_risks]
         
 
     # Visualize the results
-    classify_and_visualize(train_data, train_results)
-    classify_and_visualize(test_data, test_results)
+    # classify_and_visualize(train_data, train_results)
+    # classify_and_visualize(test_data, test_results)
     
     # Calculate accuracy
     print(f"Accuracy of Train : {accuracy(train_data[:, 1], train_results)}")
