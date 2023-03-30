@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.interpolate import UnivariateSpline
 from utils import *
 
 def run():
@@ -27,22 +28,30 @@ def run():
         train_data[train_data[:, 1] == 1, 1]
     )
     
+    polo_y[polo_y == 0] = -1e-4
+    golf_y[golf_y == 1] = -1e-3
+
+    
     # Calculating mean and variance of Polo and Golf
     polo_mean , polo_var = np.mean(polo_x) , np.var(polo_x)
     golf_mean , golf_var = np.mean(golf_x) , np.var(golf_x)
     
-    # Calculating P(Age | Polo) and P(Age | Golf) likelihoods
-    polo_dist = gaussian_dist(polo_x, polo_mean, polo_var)
-    golf_dist = gaussian_dist(golf_x, golf_mean, golf_var)
+     
+    # More X samples for smooth line
+    polo_x_smooth = np.linspace(polo_mean - 4 * np.sqrt(polo_var), polo_mean + 4 * np.sqrt(polo_var), num=500)
+    golf_x_smooth = np.linspace(golf_mean - 4 * np.sqrt(golf_var), golf_mean + 4 * np.sqrt(golf_var), num=500)
     
+    # Calculating P(Age | Polo) and P(Age | Golf) likelihoods   
+    polo_dist_smooth = gaussian_dist(polo_x_smooth, polo_mean, polo_var)
+    golf_dist_smooth = gaussian_dist(golf_x_smooth, golf_mean, golf_var)
     
     # Plotting P(Age | Polo) and P(Age | Golf) likelihoods
-    plot_line(polo_x, polo_dist,"Gaussian Distribution","Age","probabilities","P(Age | Polo)","orange",likelihoods)
-    plot_line(golf_x, golf_dist,"Gaussian Distribution", "Age","probabilities","P(Age | Golf)","red", likelihoods)
+    plot_line(polo_x_smooth, polo_dist_smooth,"Gaussian Distribution","Age","probabilities","P(Age | Polo)","blue",likelihoods)
+    plot_line(golf_x_smooth, golf_dist_smooth,"Gaussian Distribution", "Age","probabilities","P(Age | Golf)","red", likelihoods)
     
     # Scattering Polo and Golf Values 
-    plot_scatter(polo_x, polo_y,"Gaussian Distribution", "Age","probabilities","Polo","orange",likelihoods)
-    plot_scatter(golf_x, polo_y,"Gaussian Distribution", "Age","probabilities","Golf","red",likelihoods)
+    plot_scatter(polo_x, polo_y,"Gaussian Distribution", "Age","probabilities","Polo","blue",likelihoods)
+    plot_scatter(golf_x, golf_y,"Gaussian Distribution", "Age","probabilities","Golf","red",likelihoods)
     
     # Calculate P(Polo) and P(Golf)
     p_polo , p_golf = calcualate_prior(train_data)
@@ -58,9 +67,16 @@ def run():
         results = train_probas if data is train_data else test_probas
         axes = train_post if data is train_data else test_post
         title = "Posteriors on training" if data is train_data else "Posteriors on test"
-        plot_line(data[:, 0], [proba[0] for proba in results],title,"Age","probabilities","P(Polo | Age)","orange", axes)
+        
+        plot_line(data[:, 0], [proba[0] for proba in results],title,"Age","probabilities","P(Polo | Age)","blue", axes)
         plot_line(data[:, 0], [proba[1] for proba in results],title,"Age","probabilities","P(Golf | Age)","red", axes)
-    
+        
+        plot_scatter(polo_x, polo_y, title, "Age","probabilities","Polo","blue",axes)
+        plot_scatter(golf_x, golf_y, title, "Age","probabilities","Polo","red",axes)
+
+        
+        
+
     # Calculating the results and define reject threshold
     if equal_loss:
         train_results = [1 if proba[1] > proba[0] else 0 for proba in train_probas]
@@ -74,8 +90,8 @@ def run():
             train_results = thresholds_and_results[0]
             test_results = thresholds_and_results[1]
             
-            train_post.axhline(y=thresholds_and_results[2], color='blue', label="Reject Threshold Polo")
-            train_post.axhline(y=thresholds_and_results[3], color='blue')
+            train_post.axhline(y=thresholds_and_results[2], color='green', label="Reject Threshold Polo")
+            train_post.axhline(y=thresholds_and_results[3], color='green')
             train_post.legend()
             
         elif polo_cost < golf_cost:
@@ -85,8 +101,8 @@ def run():
             train_results = thresholds_and_results[0]
             test_results = thresholds_and_results[1]
             
-            train_post.axhline(y=thresholds_and_results[2], color='blue', label="Reject Threshold Golf")
-            train_post.axhline(y=thresholds_and_results[3], color='blue')
+            train_post.axhline(y=thresholds_and_results[2], color='green', label="Reject Threshold Golf")
+            train_post.axhline(y=thresholds_and_results[3], color='green')
             train_post.legend()
             
         
