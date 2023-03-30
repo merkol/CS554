@@ -120,7 +120,7 @@ def run():
     print(f"Recall of Test : {recall(test_data[:, 1], test_results, labels = [0, 1] if equal_loss else [0,1,-1]).round(2)}")
     
     # Comparing with sklearn
-    # print(predict(35, p_golf, p_polo, golf_mean, golf_var, polo_mean, polo_var))
+    print(predict(35, p_golf, p_polo, golf_mean, golf_var, polo_mean, polo_var))
     
     plt.show()
 
