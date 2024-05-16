@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.utils
 import torchvision
 from torch.utils.data import DataLoader
 from torchvision import transforms
@@ -49,27 +50,6 @@ def plot_ae_outputs(model, classes=10, samples_per_class=1):
     plt.show()
 
 
-transform = transforms.Compose([
-    transforms.ToTensor(),
-])
-
-
-# FashionMNIST dataset
-train_dataset = torchvision.datasets.MNIST(
-    root="./mnist", train=True, transform=transform, download=True
-)
-test_dataset = torchvision.datasets.MNIST(
-    root="./mnist", train=False, transform=transform, download=True
-)
-
-# Data loader
-train_loader = DataLoader(dataset=train_dataset, batch_size=512, shuffle=True)
-test_loader = DataLoader(dataset=test_dataset, batch_size=512, shuffle=True)
-
-# Hyper Parameters
-EPOCH = 20
-LR = 0.001
-
 
 class AutoEncoder(nn.Module):
     def __init__(self, latent_dim, hidden_dim):
@@ -105,62 +85,132 @@ class AutoEncoder(nn.Module):
             nn.LeakyReLU(True),
             nn.ConvTranspose2d(32, 1, kernel_size=(3, 3), stride=2, padding=0, output_padding=1),
         )
-
-    def forward(self, x):
-        # Encoder
+    
+    def encode(self, x):
         x = self.encoder_cnn(x)
         x = self.flatten(x)
         x = self.encoder_linear(x)
-
-        # Decoder
+        return x
+    
+    def decode(self, x):
         x = self.decoder_linear(x)
         x = self.unflatten(x)
         x = self.decoder_cnn(x)
+        return x
+
+    def forward(self, x):
+        x = self.encode(x)
+        x = self.decode(x)
         x = torch.sigmoid(x)
         return x
 
 
 # Train the model
-device = torch.device("cuda:0" if torch.cuda.is_available() else "mps")
-print(f"Using {device}")
-model = AutoEncoder(latent_dim=64, hidden_dim=256).to(device)
-criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer=optimizer, mode="min", patience=1, factor=0.5
-)
-
-mean_train_loss, validation_loss = [], []
-for epoch in range(EPOCH):
-    train_loss = []
-    for step, (batch, _) in enumerate(train_loader):
-        model.train()
-        batch = batch.to(device)
-        output = model(batch)  
-        loss = criterion(output, batch)  
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        train_loss.append(loss.item())
-
-    mean_train_loss.append(np.mean(train_loss))
-
-    # Validation
-    model.eval()
-    with torch.no_grad():
-        preds, ys = [], []
-        for step, (batch, _) in enumerate(test_loader):
+def train(model, train_loader, test_loader, criterion, optimizer, scheduler, version="autoencoder"):
+    mean_train_loss, validation_loss = [], []
+    for epoch in range(EPOCH):
+        train_loss = []
+        for step, (batch, label) in enumerate(train_loader):
+            model.train()
             batch = batch.to(device)
             output = model(batch)  
-            preds.append(output.cpu())
-            ys.append(batch.cpu())
-        preds, ys = torch.cat(preds) , torch.cat(ys)
-        val_loss = criterion(preds, ys)  
-        validation_loss.append(val_loss.data)
-        scheduler.step(val_loss)
-    print(
-        f"Epoch: {epoch}, Train Loss: {mean_train_loss[epoch]:.4f}, Val Loss: {validation_loss[epoch]:.4f}"
+            if version == "autoencoder":
+                loss = criterion(output, batch)
+            else:
+                loss = criterion(output, label)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            train_loss.append(loss.item())
+
+        mean_train_loss.append(np.mean(train_loss))
+
+        # Validation
+        model.eval()
+        with torch.no_grad():
+            preds, ys = [], []
+            for step, (batch, label) in enumerate(test_loader):
+                batch = batch.to(device)
+                output = model(batch)  
+                preds.append(output.cpu())
+                if version == "autoencoder":
+                    ys.append(batch.cpu())
+                else:
+                    ys.append(label.cpu())
+            preds, ys = torch.cat(preds) , torch.cat(ys)
+            val_loss = criterion(preds, ys)  
+            validation_loss.append(val_loss.data)
+            scheduler.step(val_loss)
+        print(
+            f"Epoch: {epoch}, Train Loss: {mean_train_loss[epoch]:.4f}, Val Loss: {validation_loss[epoch]:.4f}"
+        )
+    return mean_train_loss, validation_loss
+
+
+def create_dataset_from_hidden_representation(model, loader, device):
+    hidden_representations = torch.tensor([], device=device)
+    labels = torch.tensor([], device=device)
+    for batch, label in loader:
+        batch = batch.to(device)
+        label = label.to(device)
+        hidden_representation = model.encode(batch)
+        hidden_representations = torch.cat((hidden_representations, hidden_representation), dim=0)
+        labels = torch.cat((labels, label), dim=0)
+    return hidden_representations, labels  
+
+if __name__ == "__main__":
+
+    # MNIST dataset
+    train_dataset = torchvision.datasets.MNIST(
+        root="./mnist", train=True, transform=transforms.ToTensor(), download=True
+    )
+    test_dataset = torchvision.datasets.MNIST(
+        root="./mnist", train=False, transform=transforms.ToTensor(), download=True
     )
 
-plot_ae_outputs(model)
-plot_loss(mean_train_loss, validation_loss, np.linspace(0, EPOCH, EPOCH))
+    # Data loader
+    train_loader = DataLoader(dataset=train_dataset, batch_size=512, shuffle=True)
+    test_loader = DataLoader(dataset=test_dataset, batch_size=512, shuffle=True)
+
+    # Hyper Parameters
+    EPOCH = 5
+    LR = 0.001
+
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "mps")
+    print(f"Using {device}")
+    model = AutoEncoder(latent_dim=64, hidden_dim=256).to(device)
+    criterion = nn.MSELoss()
+    optimizer = optim.Adam(model.parameters(), lr=LR, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer=optimizer, mode="min", patience=1, factor=0.5
+    )
+    mean_train_loss, validation_loss = train(model, train_loader, test_loader, criterion, optimizer, scheduler)
+    
+    plot_ae_outputs(model)
+    plot_loss(mean_train_loss, validation_loss, np.linspace(0, EPOCH, EPOCH))
+    
+    train_hidden, train_labels = create_dataset_from_hidden_representation(model, train_loader, device)
+    test_hidden, test_labels = create_dataset_from_hidden_representation(model, test_loader, device)
+    
+    # create dataloader from hidden representations
+    train_loader = DataLoader(torch.utils.data.TensorDataset(train_hidden, train_labels), batch_size=512, shuffle=True)
+    test_loader = DataLoader(torch.utils.data.TensorDataset(test_hidden, test_labels), batch_size=512, shuffle=True)
+
+    # Train a classifier on the hidden representations
+    classifier = nn.Sequential(
+        nn.Linear(64, 128),
+        nn.ReLU(),
+        nn.Linear(128, 10),
+        nn.Softmax(),
+    ).to(device)
+    
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(classifier.parameters(), lr=LR, weight_decay=1e-5)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer=optimizer, mode="min", patience=1, factor=0.5
+    )
+    mean_train_loss, validation_loss = train(classifier, train_loader, test_loader, criterion, optimizer, scheduler, version="classifier")
+    
+    plot_loss(mean_train_loss, validation_loss, np.linspace(0, EPOCH, EPOCH))
+    
+
