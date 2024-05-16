@@ -13,9 +13,9 @@ def predict(model, X):
     return y_hat
 
 # function to plot the model
-def plot(y_hat, X, Y, ax, degree):
+def plot(y_hat, X, train_x, Y, ax, degree):
     ax.plot(X, y_hat, color="r", label=str(degree) + " degree")
-    ax.scatter(X, Y, color="b", label="data points")
+    ax.scatter(train_x, Y, color="b", label="data points")
     ax.set_title("Fitting with " + str(degree) + " degree")
     ax.set_xlabel("X")
     ax.set_ylabel("R")
@@ -62,7 +62,7 @@ def main():
     test_x, test_y = test_data[:, 0], test_data[:, 1]
 
     # list of degrees
-    degrees = [0, 1, 2, 3, 4, 5, 6]
+    degrees = [0, 1, 2, 3, 4, 5, 6, 7, 8]
 
     # list of figures
     figures = []
@@ -77,6 +77,7 @@ def main():
     # list of results
     train_y_hats = []
     test_y_hats = []
+    plts = []
 
     # Fitting
     for degree in degrees:
@@ -87,18 +88,23 @@ def main():
         # predicting on test data
         test_y_hat = predict(model, test_x)
         test_y_hats.append(test_y_hat)
+        
+        # predicting for the plot
+        lin = np.linspace(min(train_x), max(train_x), 100)
+        y_h = predict(model, lin)
+        plts.append((lin, y_h))
 
     # Calculating and plotting train errors for each degree
     train_errors = calculate_SSE(train_y_hats, train_y)
     error_plot(train_errors, degrees, error_fig, "Train")
-
+    
     # Calculating and plotting test errors for each degree
     test_errors = calculate_SSE(test_y_hats, test_y)
     error_plot(test_errors, degrees, error_fig, "Test")
-
+    
     # Plotting the models separately
     for i in range(len(degrees)):
-        plot(train_y_hats[i], train_x,
+        plot(plts[i][1], plts[i][0], train_x,
              train_y, figures[i], degree=i)
         figures[i].legend()
 
